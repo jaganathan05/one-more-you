@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ONE MORE YOU</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #09090b;
+    --card: #141417;
+    --line: #2c2c31;
+    --text: #f3f0e8;
+    --muted: #a7a49c;
+    --sage: #b7c7b4;
+    --track: #2a2a2e;
+    --fill: #f3f0e8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: #050506;
+    color: var(--text);
+    font-family: "Segoe UI", sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 24px 12px;
+  }
+  .phone {
+    width: min(390px, 100%);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 28px;
+    min-height: 760px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .screen { display: none; padding: 22px 18px 12px; flex: 1; }
+  .screen.active { display: block; }
+  .eyebrow {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  h1 { margin: 6px 0 0; font-size: 28px; font-weight: 500; letter-spacing: -0.4px; }
+  .note { margin: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
+  .block {
+    margin-top: 22px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--card);
+  }
+  .block h2, .row-title { margin: 0; font-size: 13px; color: var(--muted); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; }
+  .time { margin: 8px 0 0; font-size: 32px; font-weight: 500; letter-spacing: -0.6px; }
+  .sub { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  .usage { margin-top: 22px; display: flex; flex-direction: column; gap: 14px; }
+  .app-row { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: center; }
+  .icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: grid; place-items: center; font-weight: 600; color: #111;
+  }
+  .ig { background: #f3f0e8; }
+  .yt { background: #e7b1a8; }
+  .name { font-size: 15px; }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .track { margin-top: 8px; height: 8px; background: var(--track); border-radius: 99px; overflow: hidden; }
+  .fill { height: 100%; background: var(--fill); border-radius: 99px; }
+  nav {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+  }
+  nav button {
+    background: none; border: 0; color: var(--muted);
+    padding: 12px 4px 16px; font: inherit; font-size: 12px; cursor: pointer;
+  }
+  nav button.active { color: var(--text); }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  input, select {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px;
+    font: inherit;
+  }
+  .times { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .days-pick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 18px; }
+  .days-pick button {
+    background: none; border: 1px solid var(--line); color: var(--muted);
+    border-radius: 12px; padding: 10px 0; font: inherit; font-size: 12px; cursor: pointer;
+  }
+  .days-pick button.on { color: var(--text); border-color: var(--text); }
+  .apps { margin-top: 16px; display: flex; flex-direction: column; }
+  .pick {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0; border-top: 1px solid var(--line);
+  }
+  .pick button.remove, .text-btn, .seg button {
+    background: none; border: 0; color: var(--text); font: inherit; cursor: pointer;
+  }
+  .text-btn { margin-top: 12px; color: var(--sage); padding: 0; }
+  #search-box { margin-top: 12px; }
+  #search-box[hidden] { display: none; }
+  .hit {
+    width: 100%; text-align: left; background: none; border: 0; color: var(--text);
+    display: flex; gap: 12px; align-items: center; padding: 10px 0; font: inherit; cursor: pointer;
+  }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+  .seg button {
+    border: 1px solid var(--line); border-radius: 12px; padding: 10px; color: var(--muted);
+  }
+  .seg button.on { color: var(--text); border-color: var(--text); }
+  .days { display: flex; flex-direction: column; gap: 8px; }
+  .day { display: grid; grid-template-columns: 42px 1fr; gap: 8px; align-items: center; }
+  .tabs { display: flex; gap: 16px; margin-top: 18px; border-bottom: 1px solid var(--line); }
+  .tabs button { background: none; border: 0; color: var(--muted); font: inherit; padding: 8px 0 10px; cursor: pointer; }
+  .tabs button.on { color: var(--text); box-shadow: inset 0 -2px 0 var(--text); }
+  .perm { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .ok { color: var(--sage); }
+  ol { margin: 12px 0 0; padding-left: 18px; color: var(--muted); line-height: 1.5; }
+  #weekday-fields[hidden], #daily-field[hidden], .panel[hidden] { display: none; }
+</style>
+</head>
+<body>
+  <div class="phone">
+    <section class="screen active" id="home" aria-label="Home">
+      <p class="eyebrow">One more you</p>
+      <h1>Today</h1>
+      <p class="note">Selected apps stay closed during this window.</p>
+      <div class="block">
+        <h2>Scheduled time</h2>
+        <p class="time">9:00 PM – 7:00 AM</p>
+        <p class="sub">Thursday · Instagram, YouTube</p>
+        <p class="sub">Saturday and Sunday have no schedule.</p>
+      </div>
+      <div class="usage" aria-label="Apps with a daily limit">
+        <div class="app-row">
+          <div class="icon ig" aria-hidden="true">Ig</div>
+          <div>
+            <div class="name">Instagram</div>
+            <div class="meta">42 min of 60 min</div>
+            <div class="track" role="img" aria-label="Instagram used 42 of 60 minutes"><div class="fill" style="width:70%"></div></div>
+          </div>
+        </div>
+        <div class="app-row">
+          <div class="icon yt" aria-hidden="true">Yt</div>
+          <div>
+            <div class="name">YouTube</div>
+            <div class="meta">18 min of 45 min</div>
+            <div class="track" role="img" aria-label="YouTube used 18 of 45 minutes"><div class="fill" style="width:40%"></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="apps" aria-label="Apps">
+      <p class="eyebrow">Apps</p>
+      <h1>One schedule</h1>
+      <p class="note">The same hours apply to every app you add. Turn a day off when you do not want a schedule.</p>
+      <div class="days-pick" role="group" aria-label="Days with a schedule">
+        <button type="button" class="on" aria-pressed="true">Mon</button>
+        <button type="button" class="on" aria-pressed="true">Tue</button>
+        <button type="button" class="on" aria-pressed="true">Wed</button>
+        <button type="button" class="on" aria-pressed="true">Thu</button>
+        <button type="button" class="on" aria-pressed="true">Fri</button>
+        <button type="button" aria-pressed="false">Sat</button>
+        <button type="button" aria-pressed="false">Sun</button>
+      </div>
+      <div class="times">
+        <div><label for="start">Start</label><input id="start" value="21:00" /></div>
+        <div><label for="end">End</label><input id="end" value="07:00" /></div>
+      </div>
+      <div class="apps" id="chosen">
+        <div class="pick"><div class="icon ig">Ig</div><div style="flex:1">Instagram</div><button class="remove" type="button">Remove</button></div>
+        <div class="pick"><div class="icon yt">Yt</div><div style="flex:1">YouTube</div><button class="remove" type="button">Remove</button></div>
+      </div>
+      <button class="text-btn" id="add-app" type="button">Add app</button>
+      <div id="search-box" hidden>
+        <label for="find">Search</label>
+        <input id="find" placeholder="App name" />
+        <button class="hit" type="button"><span class="icon" style="background:#d7e3f5">Wa</span>WhatsApp</button>
+      </div>
+    </section>
+
+    <section class="screen" id="limits" aria-label="Limits">
+      <p class="eyebrow">Limits</p>
+      <h1>Choose an app</h1>
+      <p class="note">Any installed app can have a limit. It does not have to be on the schedule.</p>
+      <div class="pick" id="limit-chosen" style="margin-top:16px">
+        <div class="icon ig" id="limit-icon">Ig</div>
+        <div style="flex:1" id="limit-name">Instagram</div>
+      </div>
+      <button class="text-btn" id="choose-limit-app" type="button">Choose app</button>
+      <div id="limit-search" hidden>
+        <label for="limit-find">Search installed apps</label>
+        <input id="limit-find" placeholder="App name" />
+        <button class="hit" type="button" data-name="YouTube" data-mark="Yt"><span class="icon yt">Yt</span>YouTube</button>
+        <button class="hit" type="button" data-name="WhatsApp" data-mark="Wa"><span class="icon" style="background:#d7e3f5">Wa</span>WhatsApp</button>
+        <button class="hit" type="button" data-name="Chrome" data-mark="Ch"><span class="icon" style="background:#f2e2c4">Ch</span>Chrome</button>
+      </div>
+      <div class="seg" role="group" aria-label="Limit style">
+        <button type="button" class="on" id="mode-daily">One daily</button>
+        <button type="button" id="mode-week">Weekdays</button>
+      </div>
+      <div id="daily-field">
+        <label for="daily-min">Minutes</label>
+        <input id="daily-min" value="60" />
+      </div>
+      <div id="weekday-fields" hidden class="days">
+        <div class="day"><span>Mon</span><input value="30" aria-label="Monday minutes" /></div>
+        <div class="day"><span>Tue</span><input value="30" aria-label="Tuesday minutes" /></div>
+        <div class="day"><span>Wed</span><input value="30" aria-label="Wednesday minutes" /></div>
+        <div class="day"><span>Thu</span><input value="30" aria-label="Thursday minutes" /></div>
+        <div class="day"><span>Fri</span><input value="45" aria-label="Friday minutes" /></div>
+        <div class="day"><span>Sat</span><input value="60" aria-label="Saturday minutes" /></div>
+        <div class="day"><span>Sun</span><input value="60" aria-label="Sunday minutes" /></div>
+      </div>
+    </section>
+
+    <section class="screen" id="settings" aria-label="Settings">
+      <p class="eyebrow">Settings</p>
+      <h1>Settings</h1>
+      <div class="tabs" role="tablist">
+        <button type="button" class="on" id="tab-perm">Permissions</button>
+        <button type="button" id="tab-setup">Setup</button>
+      </div>
+      <div class="panel" id="panel-perm">
+        <div class="perm"><span>Display over apps</span><span class="ok">On</span></div>
+        <div class="perm"><span>Usage access</span><span class="ok">On</span></div>
+        <div class="perm"><span>Exact alarms</span><span class="ok">Allowed</span></div>
+      </div>
+      <div class="panel" id="panel-setup" hidden>
+        <ol>
+          <li>Allow display over other apps.</li>
+          <li>Allow usage access.</li>
+          <li>Allow exact alarms.</li>
+          <li>Add the apps the schedule should close.</li>
+          <li>On iQOO, allow autostart and high background power for ONE MORE YOU.</li>
+        </ol>
+      </div>
+    </section>
+
+    <nav aria-label="Sections">
+      <button type="button" class="active" data-screen="home">Home</button>
+      <button type="button" data-screen="apps">Apps</button>
+      <button type="button" data-screen="limits">Limits</button>
+      <button type="button" data-screen="settings">Settings</button>
+    </nav>
+  </div>
+<script>
+  const screens = document.querySelectorAll(".screen");
+  const nav = document.querySelectorAll("nav button");
+  nav.forEach((button) => {
+    button.addEventListener("click", () => {
+      nav.forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      screens.forEach((screen) => screen.classList.toggle("active", screen.id === button.dataset.screen));
+    });
+  });
+  document.querySelectorAll(".days-pick button").forEach((day) => {
+    day.addEventListener("click", () => {
+      const on = day.classList.toggle("on");
+      day.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  });
+  document.getElementById("add-app").addEventListener("click", () => {
+    document.getElementById("search-box").hidden = false;
+  });
+  document.getElementById("choose-limit-app").addEventListener("click", () => {
+    document.getElementById("limit-search").hidden = false;
+  });
+  document.querySelectorAll("#limit-search .hit").forEach((hit) => {
+    hit.addEventListener("click", () => {
+      document.getElementById("limit-name").textContent = hit.dataset.name;
+      const icon = document.getElementById("limit-icon");
+      icon.textContent = hit.dataset.mark;
+      document.getElementById("limit-search").hidden = true;
+    });
+  });
+  document.getElementById("mode-daily").addEventListener("click", () => {
+    document.getElementById("mode-daily").classList.add("on");
+    document.getElementById("mode-week").classList.remove("on");
+    document.getElementById("daily-field").hidden = false;
+    document.getElementById("weekday-fields").hidden = true;
+  });
+  document.getElementById("mode-week").addEventListener("click", () => {
+    document.getElementById("mode-week").classList.add("on");
+    document.getElementById("mode-daily").classList.remove("on");
+    document.getElementById("daily-field").hidden = true;
+    document.getElementById("weekday-fields").hidden = false;
+  });
+  document.getElementById("tab-perm").addEventListener("click", () => {
+    document.getElementById("tab-perm").classList.add("on");
+    document.getElementById("tab-setup").classList.remove("on");
+    document.getElementById("panel-perm").hidden = false;
+    document.getElementById("panel-setup").hidden = true;
+  });
+  document.getElementById("tab-setup").addEventListener("click", () => {
+    document.getElementById("tab-setup").classList.add("on");
+    document.getElementById("tab-perm").classList.remove("on");
+    document.getElementById("panel-perm").hidden = true;
+    document.getElementById("panel-setup").hidden = false;
+  });
+</script>
+</body>
+</html>
