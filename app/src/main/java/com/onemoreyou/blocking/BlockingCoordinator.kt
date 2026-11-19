@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import com.onemoreyou.data.SettingsRepository
 import com.onemoreyou.domain.BlockerConfig
-import com.onemoreyou.domain.LearningPassAllowance
 import com.onemoreyou.usage.UsageTracker
 import java.time.ZonedDateTime
 import kotlinx.coroutines.CoroutineScope
@@ -110,11 +109,13 @@ class BlockingCoordinator(
             try {
                 val now = clock()
                 val current = repository.snapshot().also { config = it }
-                val allowance = current.allowanceFor(packageName)
-                    ?: LearningPassAllowance(packageName, passesPerDay = 1, durationMinutes = 10)
-                if (current.allowanceFor(packageName) == null) {
-                    repository.saveAllowance(allowance)
+                val allowance = current.allowanceFor(packageName) ?: return@launch
+                if (allowance.passesPerDay <= 0) return@launch
+                val used = withContext(Dispatchers.IO) {
+                    usageTracker.foregroundMillisToday(packageName, now)
                 }
+                val decision = BlockingEngine.evaluatePackage(current, packageName, used, now)
+                if (!decision.scheduleActive || decision.limitReached) return@launch
                 val outcome = PassRules.grant(allowance, current.passStateFor(packageName), now)
                 Log.i(TAG, "confirm $packageName ${allowance.durationMinutes}m -> $outcome")
                 if (outcome is GrantOutcome.Granted) {
@@ -140,7 +141,7 @@ class BlockingCoordinator(
                 stopTicker()
                 return
             }
-            val current = withDefaultPass(config, packageName)
+            val current = config
             if (!current.isMonitored(packageName) && current.limitFor(packageName)?.enabled != true) {
                 hideBlock()
                 stopTicker()
@@ -158,6 +159,13 @@ class BlockingCoordinator(
             )
             val label = current.labelOf(packageName)
             when {
+                decision.blocked -> {
+                    shownPackage = packageName
+                    BlockScreens.dismiss()
+                    countdown.hide()
+                    overlay.render(OverlayContent.Blocking(screenState(decision, label, now)))
+                    startTicker(LIMIT_TICK_MS)
+                }
                 decision.passActive -> {
                     shownPackage = packageName
                     BlockScreens.dismiss()
@@ -165,13 +173,6 @@ class BlockingCoordinator(
                     val endsAt = decision.passEndsAtEpochMillis
                     if (endsAt != null) countdown.show(label, endsAt) else countdown.hide()
                     startTicker(PASS_TICK_MS)
-                }
-                decision.blocked -> {
-                    shownPackage = packageName
-                    BlockScreens.dismiss()
-                    countdown.hide()
-                    overlay.render(OverlayContent.Blocking(screenState(decision, label, now)))
-                    startTicker(LIMIT_TICK_MS)
                 }
                 else -> {
                     hideBlock()
@@ -192,6 +193,7 @@ class BlockingCoordinator(
                 add("Used ${BlockText.duration(decision.usedMillis)} of ${BlockText.duration(limit)} today")
             }
         }
+        val offerPass = decision.scheduleActive && !decision.limitReached && decision.passesConfigured
         return BlockScreenState(
             appLabel = label,
             reasons = reasons.ifEmpty { listOf("Blocked") },
@@ -199,7 +201,8 @@ class BlockingCoordinator(
             remainingPasses = decision.remainingPasses,
             passDurationMinutes = decision.passDurationMinutes,
             passesConfigured = decision.passesConfigured,
-            canRequestPass = decision.passesConfigured && decision.remainingPasses > 0,
+            canRequestPass = offerPass && decision.remainingPasses > 0,
+            limitBlocksPass = decision.limitReached && decision.passesConfigured,
         )
     }
 
@@ -213,13 +216,6 @@ class BlockingCoordinator(
                 evaluate()
             }
         }
-    }
-
-    private fun withDefaultPass(config: BlockerConfig, packageName: String): BlockerConfig {
-        if (config.allowanceFor(packageName) != null) return config
-        return config.withAllowance(
-            LearningPassAllowance(packageName, passesPerDay = 1, durationMinutes = 10),
-        )
     }
 
     private fun hideBlock() {

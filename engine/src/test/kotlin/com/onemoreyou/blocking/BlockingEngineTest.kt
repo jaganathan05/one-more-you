@@ -106,11 +106,39 @@ class BlockingEngineTest {
             allowance = allowance,
             passState = active,
         )
-        assertFalse(during.blocked)
+        assertTrue(during.blocked)
         assertTrue(during.passActive)
         assertTrue(during.scheduleActive)
         assertTrue(during.limitReached)
         assertEquals(0, during.remainingPasses)
+
+        val limitOnly = decision(
+            packageName = instagram,
+            now = now.plusMinutes(9),
+            schedule = null,
+            usedMillis = 40 * 60_000L,
+            limit = limit(instagram, Weekday.MONDAY to 30),
+            allowance = allowance,
+            passState = active,
+        )
+        assertTrue(limitOnly.blocked)
+        assertTrue(limitOnly.passActive)
+        assertFalse(limitOnly.scheduleActive)
+        assertTrue(limitOnly.limitReached)
+
+        val duringSchedule = decision(
+            packageName = instagram,
+            now = now.plusMinutes(9),
+            schedule = weekdaySchedule(instagram),
+            usedMillis = 10 * 60_000L,
+            limit = limit(instagram, Weekday.MONDAY to 30),
+            allowance = allowance,
+            passState = active,
+        )
+        assertFalse(duringSchedule.blocked)
+        assertTrue(duringSchedule.passActive)
+        assertTrue(duringSchedule.scheduleActive)
+        assertFalse(duringSchedule.limitReached)
 
         val expired = decision(
             packageName = instagram,
@@ -220,19 +248,19 @@ class BlockingEngineTest {
 
     @Test
     fun sharedScheduleBlocksSelectedAppsAndALimitCanStandAlone() {
-        val mondayNight = at(2026, 11, 16, 22, 0)
+        val mondayMorning = at(2026, 11, 16, 10, 0)
         val config = BlockerConfig(
             monitored = listOf(MonitoredApp(instagram, "Instagram")),
             sharedSchedule = AppSchedule.sharedDefault(),
             limits = listOf(limit(youtube, Weekday.MONDAY to 30)),
         )
-        val scheduled = BlockingEngine.evaluatePackage(config, instagram, 0L, mondayNight)
+        val scheduled = BlockingEngine.evaluatePackage(config, instagram, 0L, mondayMorning)
         assertTrue(scheduled.blocked)
         assertTrue(scheduled.scheduleActive)
-        val weekend = BlockingEngine.evaluatePackage(config, instagram, 0L, at(2026, 11, 21, 22, 0))
+        val weekend = BlockingEngine.evaluatePackage(config, instagram, 0L, at(2026, 11, 21, 10, 0))
         assertFalse(weekend.scheduleActive)
         assertFalse(weekend.blocked)
-        val limited = BlockingEngine.evaluatePackage(config, youtube, 40 * 60_000L, mondayNight)
+        val limited = BlockingEngine.evaluatePackage(config, youtube, 40 * 60_000L, mondayMorning)
         assertTrue(limited.limitReached)
         assertTrue(limited.blocked)
         assertFalse(limited.scheduleActive)

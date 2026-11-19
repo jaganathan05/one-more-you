@@ -29,8 +29,9 @@ object PassRules {
         val today = DayKeys.key(now)
         val nowMillis = now.toInstant().toEpochMilli()
         val usedToday = if (state != null && state.dayKey == today) state.passesUsed else 0
-        val perDay = (allowance?.passesPerDay ?: 0).coerceAtLeast(0)
-        val duration = (allowance?.durationMinutes ?: LearningPassAllowance.DEFAULT_PASS_MINUTES).coerceAtLeast(1)
+        val perDay = (allowance?.passesPerDay ?: 0).coerceIn(0, LearningPassAllowance.MAX_PASSES_PER_DAY)
+        val duration = (allowance?.durationMinutes ?: LearningPassAllowance.DEFAULT_PASS_MINUTES)
+            .coerceIn(1, LearningPassAllowance.MAX_PASS_MINUTES)
         val rawUntil = state?.activeUntilEpochMillis
         val remaining = if (rawUntil == null) Long.MAX_VALUE else rawUntil - nowMillis
         val coversOnlyThisPass = remaining <= duration * 60_000L + GRANT_GRACE_MILLIS
@@ -55,7 +56,7 @@ object PassRules {
         if (current.remainingPasses <= 0) return GrantOutcome.NoPassesLeft
         val today = DayKeys.key(now)
         val usedToday = if (state != null && state.dayKey == today) state.passesUsed else 0
-        val duration = allowance.durationMinutes.coerceAtLeast(1)
+        val duration = current.durationMinutes
         val until = now.toInstant().toEpochMilli() + duration * 60_000L
         return GrantOutcome.Granted(
             LearningPassSnapshot(

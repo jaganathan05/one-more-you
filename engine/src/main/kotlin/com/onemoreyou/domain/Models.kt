@@ -38,7 +38,7 @@ data class MonitoredApp(
 data class DayWindow(
     val enabled: Boolean = false,
     val startMinuteOfDay: Int = 9 * 60,
-    val endMinuteOfDay: Int = 18 * 60,
+    val endMinuteOfDay: Int = 19 * 60,
 ) {
     val overnight: Boolean get() = startMinuteOfDay > endMinuteOfDay
 
@@ -55,10 +55,10 @@ data class AppSchedule(
         const val SHARED_PACKAGE = "shared"
 
         fun sharedDefault(): AppSchedule {
-            val night = DayWindow(enabled = true, startMinuteOfDay = 21 * 60, endMinuteOfDay = 7 * 60)
-            val off = DayWindow(enabled = false, startMinuteOfDay = 21 * 60, endMinuteOfDay = 7 * 60)
+            val open = DayWindow(enabled = true, startMinuteOfDay = 9 * 60, endMinuteOfDay = 19 * 60)
+            val off = DayWindow(enabled = false, startMinuteOfDay = 9 * 60, endMinuteOfDay = 19 * 60)
             val days = Weekday.entries.associateWith { day ->
-                if (day == Weekday.SATURDAY || day == Weekday.SUNDAY) off else night
+                if (day == Weekday.SATURDAY || day == Weekday.SUNDAY) off else open
             }
             return AppSchedule(SHARED_PACKAGE, enabled = true, days = days)
         }
@@ -92,6 +92,8 @@ data class LearningPassAllowance(
 ) {
     companion object {
         const val DEFAULT_PASS_MINUTES = 10
+        const val MAX_PASSES_PER_DAY = 2
+        const val MAX_PASS_MINUTES = 15
     }
 }
 
@@ -112,6 +114,8 @@ data class BlockerConfig(
     val allowances: List<LearningPassAllowance> = emptyList(),
     val passStates: List<LearningPassSnapshot> = emptyList(),
     val names: List<MonitoredApp> = emptyList(),
+    val learningPassesPerDay: Int = 0,
+    val learningPassMinutes: Int = LearningPassAllowance.DEFAULT_PASS_MINUTES,
 ) {
     fun isMonitored(packageName: String): Boolean = monitored.any { it.packageName == packageName }
 
@@ -153,6 +157,16 @@ data class BlockerConfig(
     fun withAllowance(allowance: LearningPassAllowance): BlockerConfig = copy(
         allowances = allowances.filter { it.packageName != allowance.packageName } + allowance,
     )
+
+    fun withLearningPass(passesPerDay: Int, durationMinutes: Int): BlockerConfig {
+        val count = passesPerDay.coerceIn(0, LearningPassAllowance.MAX_PASSES_PER_DAY)
+        val minutes = durationMinutes.coerceIn(1, LearningPassAllowance.MAX_PASS_MINUTES)
+        return copy(
+            learningPassesPerDay = count,
+            learningPassMinutes = minutes,
+            allowances = allowances.map { it.copy(passesPerDay = count, durationMinutes = minutes) },
+        )
+    }
 
     fun withPassState(state: LearningPassSnapshot): BlockerConfig = copy(
         passStates = passStates.filter { it.packageName != state.packageName } + state,

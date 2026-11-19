@@ -64,8 +64,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val Orange = Color(0xFFFF6B1A)
-
 internal val SaveParagraphs = listOf(
     "I am raising this limit on purpose. Extra minutes let me stay longer, so I type every word, comma, and number before it is saved. Confirm mark: 19 Nov, code 4K-27.",
     "A higher limit is a real choice, not a quick tap. I copy this full line, including the capital letters and the semicolon; the saved time must wait until it matches. Check 08:45.",
@@ -172,7 +170,10 @@ private fun LimitList(state: LimitsUiState, model: LimitsViewModel) {
         Button(
             onClick = { searching = !searching },
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Orange, contentColor = Color(0xFF2A1206)),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
         ) {
             Text(if (searching) "Close" else "+ Add app")
         }
@@ -222,7 +223,7 @@ private fun LimitList(state: LimitsUiState, model: LimitsViewModel) {
                                 textAlign = TextAlign.Start,
                                 style = MaterialTheme.typography.titleMedium,
                             )
-                            Text(item.summary, color = Orange)
+                            Text(item.summary, color = MaterialTheme.colorScheme.primary)
                         }
                         IconButton(onClick = {
                             paragraph = SaveParagraphs.random()
@@ -265,6 +266,7 @@ private fun LimitEditor(state: LimitsUiState, model: LimitsViewModel) {
     var paragraph by rememberSaveable(app.packageName) { mutableStateOf(SaveParagraphs.first()) }
     var typed by rememberSaveable(app.packageName) { mutableStateOf("") }
     var zeroError by rememberSaveable(app.packageName) { mutableStateOf("") }
+    var dayClear by rememberSaveable(app.packageName) { mutableStateOf(0) }
     val day = Weekday.entries.firstOrNull { it.name == dayName } ?: Weekday.MONDAY
     val dayMinutes = decodeDays(dayRaw)
     val shownMinutes = if (perDay) dayMinutes[day] else uniformRaw.toIntOrNull()
@@ -287,7 +289,11 @@ private fun LimitEditor(state: LimitsUiState, model: LimitsViewModel) {
             AppIcon(app.packageName, app.label)
             Text(app.label, modifier = Modifier.padding(start = 12.dp), style = MaterialTheme.typography.titleMedium)
         }
-        Text(shortTime(shownMinutes), style = MaterialTheme.typography.headlineLarge, color = Orange)
+        Text(
+            if (perDay && day !in dayMinutes) "No limit" else shortTime(shownMinutes),
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             ModeButton("One limit", !perDay, Modifier.weight(1f)) { perDay = false }
             ModeButton("Per day", perDay, Modifier.weight(1f)) { perDay = true }
@@ -302,7 +308,17 @@ private fun LimitEditor(state: LimitsUiState, model: LimitsViewModel) {
                     ) { dayName = item.name }
                 }
             }
-            DurationChoice(day.name, dayMinutes[day]?.toString().orEmpty()) { raw ->
+            Text(
+                "Leave a day empty when that day should have no limit. 0 is not a limit.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = {
+                val updated = dayMinutes.toMutableMap()
+                updated.remove(day)
+                dayRaw = encodeDays(updated)
+                dayClear += 1
+            }) { Text("No limit on ${day.name.lowercase().replaceFirstChar { it.titlecase() }}") }
+            DurationChoice("${day.name}-$dayClear", dayMinutes[day]?.toString().orEmpty()) { raw ->
                 val updated = dayMinutes.toMutableMap()
                 val minutes = raw.toIntOrNull()
                 if (minutes == null) updated.remove(day) else updated[day] = minutes
@@ -329,7 +345,10 @@ private fun LimitEditor(state: LimitsUiState, model: LimitsViewModel) {
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Orange, contentColor = Color(0xFF2A1206)),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
         ) { Text("Save") }
     }
     if (askRaise) {
@@ -358,6 +377,7 @@ internal fun RaiseLimitDialog(
     onTyped: (String) -> Unit,
     onDismiss: () -> Unit,
     onSave: () -> Unit,
+    hint: String = "Type the paragraph below. Save opens when it matches.",
 ) {
     val matches = typed == paragraph
     val focus = remember { FocusRequester() }
@@ -384,7 +404,7 @@ internal fun RaiseLimitDialog(
             ) {
                 Text(title, style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Type the paragraph below. Save opens when it matches.",
+                    hint,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
@@ -399,7 +419,7 @@ internal fun RaiseLimitDialog(
                 )
                 Text(
                     if (matches) "Matched" else "${typed.length} of ${paragraph.length} letters",
-                    color = if (matches) Orange else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (matches) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(
                     value = typed,
@@ -414,8 +434,8 @@ internal fun RaiseLimitDialog(
                     enabled = matches,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Orange,
-                        contentColor = Color(0xFF2A1206),
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
                         disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
@@ -432,8 +452,8 @@ private fun ModeButton(label: String, on: Boolean, modifier: Modifier, onClick: 
         onClick = onClick,
         modifier = modifier,
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (on) Orange else MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = if (on) Color(0xFF2A1206) else MaterialTheme.colorScheme.onSurfaceVariant,
+            containerColor = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     ) { Text(label) }
 }
@@ -445,8 +465,8 @@ private fun DayChip(label: String, on: Boolean, modifier: Modifier, onClick: () 
         modifier = modifier,
         contentPadding = PaddingValues(0.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (on) Orange else MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = if (on) Color(0xFF2A1206) else MaterialTheme.colorScheme.onSurfaceVariant,
+            containerColor = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     ) { Text(label, style = MaterialTheme.typography.bodySmall) }
 }

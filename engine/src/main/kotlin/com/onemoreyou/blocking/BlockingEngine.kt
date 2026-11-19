@@ -44,7 +44,7 @@ object BlockingEngine {
         val limitMillis = limitMinutes?.times(60_000L)
         val limitReached = limitMillis != null && input.usedMillis >= limitMillis
         val covered = input.monitored || input.usageLimit?.enabled == true
-        val blocked = covered && !pass.active && (scheduleActive || limitReached)
+        val blocked = covered && (limitReached || (scheduleActive && !pass.active))
         return BlockDecision(
             blocked = blocked,
             scheduleActive = scheduleActive,

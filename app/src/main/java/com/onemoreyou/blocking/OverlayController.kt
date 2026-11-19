@@ -8,6 +8,8 @@ import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.FrameLayout
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
@@ -22,6 +24,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.onemoreyou.OneMoreYouApp
 import com.onemoreyou.R
 import com.onemoreyou.ui.OneMoreYouTheme
 import com.onemoreyou.ui.overlay.BlockingOverlay
@@ -89,7 +92,9 @@ class OverlayController(
             setViewTreeViewModelStoreOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setContent {
-                OneMoreYouTheme {
+                val accent by (context.applicationContext as OneMoreYouApp)
+                    .container.repository.themeFlow.collectAsState(initial = "sky")
+                OneMoreYouTheme(accent) {
                     when (val state = content.value) {
                         OverlayContent.Hidden -> Unit
                         is OverlayContent.Blocking -> BlockingOverlay(

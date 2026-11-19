@@ -7,8 +7,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.onemoreyou.OneMoreYouApp
 import com.onemoreyou.ui.OneMoreYouTheme
 import com.onemoreyou.ui.overlay.BlockingOverlay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,7 +51,8 @@ class BlockActivity : ComponentActivity() {
                 if (screen == null) finish()
             }
             val current = screen ?: return@setContent
-            OneMoreYouTheme {
+            val accent by (application as OneMoreYouApp).container.repository.themeFlow.collectAsState(initial = "sky")
+            OneMoreYouTheme(accent) {
                 BlockingOverlay(
                     state = current,
                     onConfirmPass = { BlockScreens.onConfirm() },

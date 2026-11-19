@@ -1,6 +1,5 @@
 package com.onemoreyou
 
-import com.onemoreyou.domain.LearningPassAllowance
 import com.onemoreyou.domain.MonitoredApp
 
 object SocialArm {
@@ -23,16 +22,11 @@ object SocialArm {
         }
         if (installed.isEmpty()) return emptyList()
         val repository = app.container.repository
+        if (repository.isScheduleLocked()) return installed.map { it.second }
         val current = repository.snapshot().monitored
         val selected = installed.map { (packageName, label) -> MonitoredApp(packageName, label) }
         repository.setMonitored((current + selected).distinctBy { it.packageName })
         repository.saveSharedSchedule(com.onemoreyou.domain.AppSchedule.sharedDefault())
-        installed.forEach { (packageName, _) ->
-            val existing = repository.snapshot().allowanceFor(packageName)
-            if (existing == null || existing.passesPerDay <= 0) {
-                repository.saveAllowance(LearningPassAllowance(packageName, passesPerDay = 1, durationMinutes = 10))
-            }
-        }
         return installed.map { it.second }
     }
 }

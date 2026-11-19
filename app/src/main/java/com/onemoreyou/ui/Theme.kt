@@ -22,11 +22,24 @@ val Card = Color(0xFF1C2030)
 
 val BarColors = listOf(Coral, Amber, Mint, Sky, Violet)
 
-private val Colors = darkColorScheme(
-    primary = Coral,
-    onPrimary = Color(0xFF2A0C06),
-    primaryContainer = Color(0xFF5A2418),
-    onPrimaryContainer = Color(0xFFFFD8CF),
+enum class AppAccent(val id: String, val label: String, val color: Color) {
+    CORAL("coral", "Coral", Coral),
+    AMBER("amber", "Amber", Amber),
+    MINT("mint", "Green", Mint),
+    SKY("sky", "Blue", Sky),
+    VIOLET("violet", "Violet", Violet),
+    ;
+
+    companion object {
+        fun fromId(id: String): AppAccent = entries.firstOrNull { it.id == id } ?: SKY
+    }
+}
+
+private fun colorsFor(accent: AppAccent) = darkColorScheme(
+    primary = accent.color,
+    onPrimary = Color(0xFF1A1208),
+    primaryContainer = accent.color.copy(alpha = 0.28f),
+    onPrimaryContainer = Color(0xFFFFF6F0),
     secondary = Mint,
     onSecondary = Color(0xFF042216),
     tertiary = Sky,
@@ -57,9 +70,9 @@ private val AppShapes = Shapes(
 )
 
 @Composable
-fun OneMoreYouTheme(content: @Composable () -> Unit) {
+fun OneMoreYouTheme(accentId: String = AppAccent.SKY.id, content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = Colors,
+        colorScheme = colorsFor(AppAccent.fromId(accentId)),
         typography = Type,
         shapes = AppShapes,
         content = content,

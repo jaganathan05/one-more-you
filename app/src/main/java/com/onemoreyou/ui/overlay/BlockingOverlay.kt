@@ -66,22 +66,24 @@ fun BlockingOverlay(
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(28.dp))
-            if (state.passesConfigured) {
+            if (state.canRequestPass) {
                 WideButton(
-                    text = if (state.canRequestPass) {
-                        "Start ${state.passDurationMinutes} min pass"
-                    } else {
-                        "No learning passes left today"
-                    },
+                    text = "Start ${state.passDurationMinutes} min pass",
                     onClick = onConfirmPass,
-                    enabled = state.canRequestPass,
+                )
+                Spacer(Modifier.height(10.dp))
+            } else if (state.passesConfigured && state.remainingPasses == 0 && !state.limitBlocksPass) {
+                WideButton(
+                    text = "No learning passes left today",
+                    onClick = onConfirmPass,
+                    enabled = false,
                 )
                 Spacer(Modifier.height(10.dp))
             }
             QuietButton("Leave app", onLeave)
             Spacer(Modifier.height(28.dp))
             Text(
-                "Leave this app, or start a learning pass for it. Pass time still counts toward today's limit. The countdown stays in the notification.",
+                "Leave this app. A learning pass can open it during the schedule. After today's time for this app is used up, the pass does not open it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -109,6 +111,8 @@ fun CountdownBanner(appLabel: String, remainingMillis: Long) {
 }
 
 private fun passLine(state: BlockScreenState): String = when {
-    !state.passesConfigured -> "Learning pass is off for this app."
-    else -> "${state.remainingPasses} learning ${if (state.remainingPasses == 1) "pass" else "passes"} left today · ${state.passDurationMinutes} min each"
+    !state.passesConfigured -> "Learning pass is off."
+    state.limitBlocksPass -> "Today's time for this app is used up, so a pass cannot open it."
+    state.remainingPasses <= 0 -> "No learning passes left today."
+    else -> "${state.remainingPasses} ${if (state.remainingPasses == 1) "pass" else "passes"} left today, ${state.passDurationMinutes} min each. A pass opens only this app during the schedule."
 }

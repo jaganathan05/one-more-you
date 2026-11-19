@@ -11,6 +11,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
 import com.onemoreyou.navigation.OneMoreYouRoot
 import com.onemoreyou.service.BlockerWatchService
@@ -22,11 +24,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         requestNotificationPermission()
         pinHomeIcon()
+        lifecycleScope.launch {
+            (application as OneMoreYouApp).container.repository.migrateLegacyNightHours()
+        }
         startForegroundService(Intent(this, BlockerWatchService::class.java))
         armIfRequested(intent)
         enableEdgeToEdge()
         setContent {
-            OneMoreYouTheme {
+            val accent by (application as OneMoreYouApp).container.repository.themeFlow.collectAsState(initial = "sky")
+            OneMoreYouTheme(accent) {
                 OneMoreYouRoot()
             }
         }

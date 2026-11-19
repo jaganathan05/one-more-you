@@ -12,6 +12,7 @@ data class BlockScreenState(
     val passDurationMinutes: Int,
     val passesConfigured: Boolean,
     val canRequestPass: Boolean,
+    val limitBlocksPass: Boolean,
 )
 
 object BlockText {

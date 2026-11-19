@@ -1,5 +1,6 @@
 package com.onemoreyou.navigation
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
@@ -35,7 +36,7 @@ private data class Destination(val route: String, val label: String, val icon: I
 
 private val destinations = listOf(
     Destination("home", "Home", Icons.Filled.Home),
-    Destination("apps", "Apps", Icons.AutoMirrored.Filled.ViewList),
+    Destination("apps", "Schedule", Icons.AutoMirrored.Filled.ViewList),
     Destination("limits", "Limits", Icons.Filled.HourglassBottom),
     Destination("settings", "Settings", Icons.Filled.Settings),
 )
@@ -81,7 +82,7 @@ fun OneMoreYouRoot() {
         NavHost(
             navController = nav,
             startDestination = "home",
-            modifier = Modifier.padding(padding),
+            modifier = Modifier.padding(padding).fillMaxSize(),
         ) {
             composable("home") {
                 HomeRoute(
