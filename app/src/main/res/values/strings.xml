@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">ONE MORE YOU</string>
+    <string name="launcher_name">OMY</string>
     <string name="accessibility_description">ONE MORE YOU blocks the apps you select during a schedule or after a daily usage limit. It can show a blocking screen and allow a learning pass for that app only. Turn this service off in Accessibility settings to stop blocking.</string>
 </resources>
