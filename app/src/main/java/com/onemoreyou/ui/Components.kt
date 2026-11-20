@@ -31,8 +31,8 @@ fun SectionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        colors = CardDefaults.cardColors(containerColor = LocalAppLook.current.card),
+        border = BorderStroke(1.dp, LocalAppLook.current.line),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
@@ -80,8 +80,10 @@ fun WideButton(text: String, onClick: () -> Unit, enabled: Boolean = true) {
         modifier = Modifier.fillMaxWidth().height(52.dp),
         shape = MaterialTheme.shapes.small,
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+            containerColor = LocalAppLook.current.accent,
+            contentColor = LocalAppLook.current.onAccent,
+            disabledContainerColor = LocalAppLook.current.raised,
+            disabledContentColor = LocalAppLook.current.faint,
         ),
     ) {
         Text(text)
@@ -94,7 +96,8 @@ fun QuietButton(text: String, onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().height(52.dp),
         shape = MaterialTheme.shapes.small,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        border = BorderStroke(1.5.dp, LocalAppLook.current.strongBorder),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalAppLook.current.text),
     ) {
         Text(text)
     }

@@ -75,6 +75,21 @@ class UsageCalculatorTest {
     }
 
     @Test
+    fun openVisitCountsUntilTheUsageLogCatchesUp() {
+        val seenAt = 1_000L
+        val now = 61_000L
+        assertEquals(70_000L, UsageSession.millisToday(10_000L, logShowsThisAppOpen = false, seenAt, now))
+        assertEquals(10_000L, UsageSession.millisToday(10_000L, logShowsThisAppOpen = true, seenAt, now))
+        assertEquals(10_000L, UsageSession.millisToday(10_000L, logShowsThisAppOpen = false, null, now))
+    }
+
+    @Test
+    fun stoppedActivityClosesTheVisit() {
+        val mapped = UsageEventMapper.toTransition(UsageEventMapper.ACTIVITY_STOPPED, "com.instagram.android", 5_000)
+        assertEquals(TransitionType.EXIT, mapped?.type)
+    }
+
+    @Test
     fun localMidnightResetsTheUsageDayInIndia() {
         val late = ZonedDateTime.of(2026, 11, 16, 23, 30, 0, 0, zone)
         val early = ZonedDateTime.of(2026, 11, 17, 0, 10, 0, 0, zone)

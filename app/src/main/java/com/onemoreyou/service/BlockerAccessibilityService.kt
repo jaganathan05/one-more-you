@@ -5,8 +5,8 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.onemoreyou.OneMoreYouApp
 import com.onemoreyou.blocking.BlockingCoordinator
-import com.onemoreyou.blocking.PaymentApps
 import com.onemoreyou.blocking.OverlayController
+import com.onemoreyou.blocking.PaymentApps
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,31 +23,31 @@ class BlockerAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         val container = (application as OneMoreYouApp).container
-        val overlay = OverlayController(
-            context = this,
-            onRequestPass = { coordinator?.onConfirmPass() },
-            onLeave = {
-                coordinator?.clearTracked()
-                performGlobalAction(GLOBAL_ACTION_HOME)
-            },
-        )
-        val created = BlockingCoordinator(
-            appContext = this,
-            ownPackage = packageName,
-            repository = container.repository,
-            usageTracker = container.usageTracker,
-            overlay = overlay,
-            leaveApp = { performGlobalAction(GLOBAL_ACTION_HOME) },
-            scope = scope,
-        )
+        val created = BlockerHub.retain { coordinatorScope ->
+            val overlay = OverlayController(
+                context = this,
+                onRequestPass = { coordinator?.onConfirmPass() },
+                onLeave = {
+                    coordinator?.onAccessibilityHome()
+                    performGlobalAction(GLOBAL_ACTION_HOME)
+                },
+            )
+            BlockingCoordinator(
+                appContext = this,
+                ownPackage = packageName,
+                repository = container.repository,
+                usageTracker = container.usageTracker,
+                overlay = overlay,
+                leaveApp = { performGlobalAction(GLOBAL_ACTION_HOME) },
+                scope = coordinatorScope,
+            )
+        }
         coordinator = created
-        created.start()
-        ReevaluateBus.setListener { created.reevaluate() }
         created.reevaluate()
         scope.launch {
             while (isActive) {
-                delay(2_000)
-                created.reevaluate()
+                delay(1_000)
+                reportForeground(activePackage())
             }
         }
     }
@@ -55,33 +55,52 @@ class BlockerAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         val type = event.eventType
-        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        val packageName = event.packageName?.toString() ?: return
-        Log.i("OMY", "window $packageName ${event.className}")
-        if (isChrome(packageName)) return
-        if (PaymentApps.isPayment(packageName)) {
-            coordinator?.onPaymentApp()
-            runCatching { PaymentPause.pause(this) }
-            return
-        }
-        coordinator?.onWindow(packageName, event.className?.toString())
+        val windowChanged = type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
+            type == AccessibilityEvent.TYPE_WINDOWS_CHANGED
+        if (!windowChanged) return
+        val windowPackage = event.packageName?.toString() ?: activePackage() ?: return
+        Log.i("OMY", "window $windowPackage ${event.className}")
+        reportForeground(windowPackage, event.className?.toString())
     }
 
     override fun onInterrupt() = Unit
 
-    private fun isChrome(packageName: String): Boolean {
+    private fun reportForeground(windowPackage: String?, className: String? = null) {
+        if (windowPackage.isNullOrBlank()) return
+        when {
+            PaymentApps.isPayment(windowPackage) -> {
+                coordinator?.onPaymentApp()
+                runCatching { PaymentPause.pause(this) }
+            }
+            isLauncher(windowPackage) -> coordinator?.onAccessibilityHome()
+            isIgnoredSystem(windowPackage) -> Unit
+            else -> coordinator?.onAccessibilityWindow(windowPackage, className)
+        }
+    }
+
+    private fun activePackage(): String? {
+        val root = rootInActiveWindow ?: return null
+        val name = root.packageName?.toString()
+        return name
+    }
+
+    private fun isLauncher(packageName: String): Boolean {
+        return packageName == "com.android.launcher3" ||
+            packageName.startsWith("com.bbk.launcher") ||
+            packageName.contains("launcher")
+    }
+
+    private fun isIgnoredSystem(packageName: String): Boolean {
         return packageName == "android" ||
             packageName == "com.android.systemui" ||
-            packageName == "com.android.launcher3" ||
-            packageName.startsWith("com.bbk.launcher") ||
             packageName == "com.vivo.upslide" ||
             packageName == "com.vivo.systemuiplugin" ||
             packageName.contains("inputmethod")
     }
 
     override fun onDestroy() {
-        ReevaluateBus.setListener(null)
-        coordinator?.stop()
+        coordinator?.accessibilityStopped()
+        coordinator?.let { BlockerHub.release(it) }
         coordinator = null
         scope.cancel()
         super.onDestroy()

@@ -26,7 +26,8 @@ fun BlockingOverlay(
     onConfirmPass: () -> Unit,
     onLeave: () -> Unit,
 ) {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    val look = com.onemoreyou.ui.LocalAppLook.current
+    Surface(modifier = Modifier.fillMaxSize(), color = look.block) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -35,14 +36,14 @@ fun BlockingOverlay(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                "PAUSED",
+                "ONE MORE YOU",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = look.accent,
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                state.appLabel,
-                style = MaterialTheme.typography.headlineLarge,
+                "${state.appLabel} is closed",
+                style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(16.dp))
@@ -68,7 +69,7 @@ fun BlockingOverlay(
             Spacer(Modifier.height(28.dp))
             if (state.canRequestPass) {
                 WideButton(
-                    text = "Start ${state.passDurationMinutes} min pass",
+                    text = "Use a ${state.passDurationMinutes} min pass",
                     onClick = onConfirmPass,
                 )
                 Spacer(Modifier.height(10.dp))
@@ -80,7 +81,7 @@ fun BlockingOverlay(
                 )
                 Spacer(Modifier.height(10.dp))
             }
-            QuietButton("Leave app", onLeave)
+            WideButton("Go to home screen", onClick = onLeave)
             Spacer(Modifier.height(28.dp))
             Text(
                 "Leave this app. A learning pass can open it during the schedule. After today's time for this app is used up, the pass does not open it.",

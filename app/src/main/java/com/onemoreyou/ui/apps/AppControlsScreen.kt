@@ -1,6 +1,7 @@
 package com.onemoreyou.ui.apps
 
 import android.app.Application
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -48,8 +49,10 @@ import com.onemoreyou.domain.LearningPassAllowance
 import com.onemoreyou.domain.MonitoredApp
 import com.onemoreyou.domain.Weekday
 import com.onemoreyou.ui.AppIcon
+import com.onemoreyou.ui.LocalAppLook
 import com.onemoreyou.ui.LockConfirmDialog
 import com.onemoreyou.ui.UnlockPrayers
+import com.onemoreyou.ui.QuietButton
 import com.onemoreyou.ui.WideButton
 import com.onemoreyou.ui.limits.RaiseLimitDialog
 import com.onemoreyou.ui.limits.SaveParagraphs
@@ -136,6 +139,13 @@ class AppsViewModel(app: Application) : AndroidViewModel(app) {
         schedule.copy(days = schedule.days.mapValues { (_, window) -> window.copy(endMinuteOfDay = minute) })
     }
 
+    fun setDays(on: Set<Weekday>) = edit { schedule ->
+        val (start, end) = hours(schedule)
+        schedule.copy(days = Weekday.entries.associateWith { day ->
+            DayWindow(enabled = day in on, startMinuteOfDay = start, endMinuteOfDay = end)
+        })
+    }
+
     private fun edit(transform: (AppSchedule) -> AppSchedule) {
         viewModelScope.launch {
             if (container.repository.isScheduleLocked()) return@launch
@@ -160,7 +170,8 @@ fun AppControlsRoute(model: AppsViewModel = viewModel()) {
     var unlockPrayer by rememberSaveable { mutableStateOf(UnlockPrayers.first()) }
     var unlockTyped by rememberSaveable { mutableStateOf("") }
     val locked = state.locked
-    val canLock = state.schedule.days.values.any { it.enabled && it.startMinuteOfDay != it.endMinuteOfDay }
+    val canLock = state.selected.isNotEmpty() &&
+        state.schedule.days.values.any { it.enabled && it.startMinuteOfDay != it.endMinuteOfDay }
     val hours = state.schedule.days.values.firstOrNull { it.enabled } ?: state.schedule.days.values.firstOrNull()
     val start = hours?.startMinuteOfDay ?: 9 * 60
     val end = hours?.endMinuteOfDay ?: 19 * 60
@@ -174,29 +185,37 @@ fun AppControlsRoute(model: AppsViewModel = viewModel()) {
             .padding(PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp)),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        val look = LocalAppLook.current
         Text("Schedule", style = MaterialTheme.typography.headlineSmall)
         Text(
-            if (locked) {
-                "Locked. Days, times, apps, and passes are read-only. Unlocking asks you to type a prayer."
-            } else if (!canLock) {
-                "Pick at least one day before you can lock this schedule. With no day on, there is nothing to lock."
-            } else {
-                "These hours close the apps you add. Default hours are 9:00 AM to 7:00 PM. A learning pass is off until you turn it on for one of those apps."
-            },
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            if (locked) "Locked. Stay with it." else "Pick when apps close. Then lock it.",
+            color = look.muted,
         )
-        WideButton(
-            if (locked) "Unlock schedule" else "Lock schedule",
-            enabled = locked || canLock,
-            onClick = {
-                if (!locked && !canLock) return@WideButton
-                if (locked) {
-                    unlockPrayer = UnlockPrayers.random()
-                    unlockTyped = ""
-                }
-                askLock = true
-            },
-        )
+        if (!locked) {
+            val daysOn = state.schedule.days.filterValues { it.enabled }.keys
+            val dayText = if (daysOn.isEmpty()) "no days" else daysOn.joinToString(", ") { it.name.take(3) }
+            val names = state.selected.map { it.label }
+            val who = when (names.size) {
+                0 -> "Your schedule is empty. Follow steps 1, 2 and 3 below."
+                else -> "${names.joinToString(" and ")} close on $dayText, ${BlockText.minuteOfDay(start)} – ${BlockText.minuteOfDay(end)}."
+            }
+            Column(Modifier.fillMaxWidth().background(look.accentSoft, RoundedCornerShape(16.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("YOUR SCHEDULE", color = look.muted, style = MaterialTheme.typography.labelLarge)
+                Text(who)
+                Text(
+                    when {
+                        state.selected.isEmpty() -> "Add an app to lock this"
+                        daysOn.isEmpty() -> "Turn on a day to lock this"
+                        start == end -> "Start and end can't be the same"
+                        else -> "Ready to lock"
+                    },
+                    color = if (canLock) look.good else look.warning,
+                )
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("1 Which days?", style = MaterialTheme.typography.titleMedium)
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
             Weekday.displayOrder.forEach { day ->
                 WideDay(
@@ -208,9 +227,17 @@ fun AppControlsRoute(model: AppsViewModel = viewModel()) {
                 )
             }
         }
+        if (!locked) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                QuietButton("Weekdays", onClick = { model.setDays(setOf(Weekday.MONDAY, Weekday.TUESDAY, Weekday.WEDNESDAY, Weekday.THURSDAY, Weekday.FRIDAY)) })
+                QuietButton("Every day", onClick = { model.setDays(Weekday.entries.toSet()) })
+                QuietButton("Weekend", onClick = { model.setDays(setOf(Weekday.SATURDAY, Weekday.SUNDAY)) })
+            }
+        }
+        Text("2 Which hours?", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            TimeField("Start", start, Modifier.weight(1f), !locked, model::setStart)
-            TimeField("End", end, Modifier.weight(1f), !locked, model::setEnd)
+            TimeField("Starts", start, Modifier.weight(1f), !locked, model::setStart)
+            TimeField("Ends", end, Modifier.weight(1f), !locked, model::setEnd)
         }
         LazyColumn(
             modifier = Modifier.fillMaxWidth().weight(1f),
@@ -219,7 +246,7 @@ fun AppControlsRoute(model: AppsViewModel = viewModel()) {
         ) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Text("In this schedule", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    Text("3 Which apps?", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                     TextButton(
                         onClick = {
                             query = ""
@@ -255,6 +282,25 @@ fun AppControlsRoute(model: AppsViewModel = viewModel()) {
                     }
                 }
             }
+            item {
+                WideButton(
+                    if (locked) "Unlock schedule" else "Lock schedule",
+                    enabled = locked || canLock,
+                    onClick = {
+                        if (!locked && !canLock) return@WideButton
+                        if (locked) {
+                            unlockPrayer = UnlockPrayers.random()
+                            unlockTyped = ""
+                        }
+                        askLock = true
+                    },
+                )
+                Text(
+                    if (locked) "Unlocking asks you to type a prayer." else "Locking is quick. To unlock later you will type a prayer.",
+                    color = LocalAppLook.current.faint,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
         }
     }
     val editing = state.selected.find { it.packageName == passApp }
@@ -286,7 +332,7 @@ fun AppControlsRoute(model: AppsViewModel = viewModel()) {
     } else if (askLock) {
         LockConfirmDialog(
             title = "Lock the schedule",
-            explanation = "Locking makes the days, times, apps, and passes read-only.",
+            explanation = "Days, times, and apps stay as they are.",
             confirmLabel = "Lock",
             onDismiss = { askLock = false },
             onConfirmed = {
@@ -327,7 +373,7 @@ private fun PassPopup(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(app.label, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Off until you turn it on. During the schedule it can open only this app. After today's time is used up, it does not open. Saving a change asks you to type a paragraph.",
+                    "A short open during these hours. Off means no extra time.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {

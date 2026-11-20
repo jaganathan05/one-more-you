@@ -36,8 +36,16 @@ class BlockingCoordinator(
     private var pending: Job? = null
     private var granting = false
     private var paymentOpen = false
+    private var started = false
+    private var accessibilityAuthoritative = false
+    private var trustedPackage: String? = null
+    private var livePackage: String? = null
+    private var liveSinceMillis: Long = 0L
+    private var liveBaseUsed: Long = 0L
 
     fun start() {
+        if (started) return
+        started = true
         scope.launch {
             repository.configFlow.collect { updated ->
                 config = updated
@@ -54,7 +62,41 @@ class BlockingCoordinator(
         scope.launch { evaluate() }
     }
 
-    fun onWindow(packageName: String?, className: String?) {
+    fun onAccessibilityWindow(packageName: String, className: String?) {
+        accessibilityAuthoritative = true
+        trustedPackage = packageName
+        onWindow(packageName, className, authoritative = true)
+    }
+
+    fun onAccessibilityHome() {
+        accessibilityAuthoritative = true
+        trustedPackage = null
+        clearTracked()
+    }
+
+    fun accessibilityStopped() {
+        accessibilityAuthoritative = false
+        trustedPackage = null
+    }
+
+    fun onUsageHint(packageName: String?) {
+        if (packageName != null && PaymentApps.isPayment(packageName)) {
+            onPaymentApp()
+            return
+        }
+        if (packageName.isNullOrBlank()) {
+            scope.launch { evaluate() }
+            return
+        }
+        if (accessibilityAuthoritative && trustedPackage != null && trustedPackage != packageName) {
+            scope.launch { evaluate() }
+            return
+        }
+        val className = if (packageName == ownPackage) MAIN_ACTIVITY else null
+        onWindow(packageName, className, authoritative = false)
+    }
+
+    fun onWindow(packageName: String?, className: String?, authoritative: Boolean = false) {
         if (packageName != null && PaymentApps.isPayment(packageName)) {
             onPaymentApp()
             return
@@ -69,15 +111,20 @@ class BlockingCoordinator(
             }
             return
         }
+        if (!packageName.isNullOrBlank()) trackedPackage = packageName
         if (packageName.isNullOrBlank() || packageName == shownPackage) {
             scope.launch { evaluate() }
             return
         }
         trackedPackage = packageName
         pending?.cancel()
-        pending = scope.launch {
-            delay(200)
-            evaluate()
+        if (authoritative) {
+            scope.launch { evaluate() }
+        } else {
+            pending = scope.launch {
+                delay(200)
+                evaluate()
+            }
         }
     }
 
@@ -93,7 +140,9 @@ class BlockingCoordinator(
                 evaluate()
                 return@launch
             }
-            if (shownPackage == null) {
+            if (accessibilityAuthoritative && !trustedPackage.isNullOrBlank()) {
+                trackedPackage = trustedPackage
+            } else {
                 val detected = withContext(Dispatchers.IO) { usageTracker.currentForeground(clock()) }
                 if (!detected.isNullOrBlank() && detected != ownPackage) trackedPackage = detected
             }
@@ -113,7 +162,7 @@ class BlockingCoordinator(
                 if (allowance.passesPerDay <= 0) return@launch
                 val used = withContext(Dispatchers.IO) {
                     usageTracker.foregroundMillisToday(packageName, now)
-                }
+                }.let { rememberLiveUsage(packageName, it, now.toInstant().toEpochMilli()) }
                 val decision = BlockingEngine.evaluatePackage(current, packageName, used, now)
                 if (!decision.scheduleActive || decision.limitReached) return@launch
                 val outcome = PassRules.grant(allowance, current.passStateFor(packageName), now)
@@ -147,9 +196,10 @@ class BlockingCoordinator(
                 stopTicker()
                 return
             }
-            val used = withContext(Dispatchers.IO) {
+            val usedStats = withContext(Dispatchers.IO) {
                 usageTracker.foregroundMillisToday(packageName, now)
             }
+            val used = rememberLiveUsage(packageName, usedStats, now.toInstant().toEpochMilli())
             val decision = BlockingEngine.evaluatePackage(current, packageName, used, now)
             Log.i(
                 TAG,
@@ -164,7 +214,7 @@ class BlockingCoordinator(
                     BlockScreens.dismiss()
                     countdown.hide()
                     overlay.render(OverlayContent.Blocking(screenState(decision, label, now)))
-                    startTicker(LIMIT_TICK_MS)
+                    startTicker(PASS_TICK_MS)
                 }
                 decision.passActive -> {
                     shownPackage = packageName
@@ -176,7 +226,7 @@ class BlockingCoordinator(
                 }
                 else -> {
                     hideBlock()
-                    startTicker(LIMIT_TICK_MS)
+                    startTicker(PASS_TICK_MS)
                 }
             }
         }
@@ -204,6 +254,15 @@ class BlockingCoordinator(
             canRequestPass = offerPass && decision.remainingPasses > 0,
             limitBlocksPass = decision.limitReached && decision.passesConfigured,
         )
+    }
+
+    private fun rememberLiveUsage(packageName: String, statsUsed: Long, nowMillis: Long): Long {
+        if (livePackage != packageName || statsUsed < liveBaseUsed) {
+            livePackage = packageName
+            liveSinceMillis = nowMillis
+            liveBaseUsed = statsUsed
+        }
+        return maxOf(statsUsed, liveBaseUsed + (nowMillis - liveSinceMillis))
     }
 
     private fun startTicker(intervalMs: Long) {
@@ -234,7 +293,6 @@ class BlockingCoordinator(
     private companion object {
         const val TAG = "OMY"
         const val PASS_TICK_MS = 1_000L
-        const val LIMIT_TICK_MS = 10_000L
         const val SETTINGS_PACKAGE = "com.android.settings"
         const val MAIN_ACTIVITY = "com.onemoreyou.MainActivity"
     }

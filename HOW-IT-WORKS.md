@@ -80,3 +80,11 @@ The engine is plain Kotlin. It can be tested on a computer without a phone. That
 3. The engine allows the app if a learning pass is still running for that app.
 4. Otherwise the engine blocks it when the shared schedule is active, or when today's limit is used up.
 5. The overlay covers the app. If you start a pass, the overlay goes away and the notification counts down. When the time ends, the app is blocked again.
+
+## Later
+
+The release APK build is manual, and only the engine rules have unit tests. Add the rest later:
+
+- Run `:engine:test` inside the GitHub build, and run that build on every push, not only when someone clicks **Run workflow**.
+- Add automated tests for the phone screens: Schedule, the schedule lock, the uninstall lock, Limits, and Settings.
+- Keep those screen tests in the same build so a push checks the rules and the screens before an APK is published.

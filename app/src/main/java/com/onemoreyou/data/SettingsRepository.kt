@@ -65,9 +65,9 @@ class SettingsRepository(context: Context) {
 
     suspend fun setScheduleLocked(locked: Boolean) {
         if (locked) {
-            val days = snapshot().sharedSchedule.days.values
-            val ready = days.any { it.enabled && it.startMinuteOfDay != it.endMinuteOfDay }
-            if (!ready) return
+            val config = snapshot()
+            val daysReady = config.sharedSchedule.days.values.any { it.enabled && it.startMinuteOfDay != it.endMinuteOfDay }
+            if (!daysReady || config.monitored.isEmpty()) return
         }
         store.edit { prefs -> prefs[SCHEDULE_LOCK_KEY] = locked }
     }
@@ -94,7 +94,13 @@ class SettingsRepository(context: Context) {
         }
     }
 
-    val themeFlow: Flow<String> = store.data.map { prefs -> prefs[THEME_KEY] ?: "sky" }
+    val themeFlow: Flow<String> = store.data.map { prefs -> prefs[THEME_KEY] ?: "midnight" }
+
+    val introSeenFlow: Flow<Boolean> = store.data.map { prefs -> prefs[INTRO_SEEN_KEY] == true }
+
+    suspend fun markIntroSeen() {
+        store.edit { prefs -> prefs[INTRO_SEEN_KEY] = true }
+    }
 
     suspend fun saveTheme(id: String) {
         store.edit { prefs -> prefs[THEME_KEY] = id }
@@ -119,5 +125,6 @@ class SettingsRepository(context: Context) {
         val THEME_KEY = stringPreferencesKey("theme")
         val SCHEDULE_LOCK_KEY = booleanPreferencesKey("schedule_locked")
         val HOURS_MIGRATED_KEY = booleanPreferencesKey("schedule_hours_9_to_19")
+        val INTRO_SEEN_KEY = booleanPreferencesKey("setup_intro_seen")
     }
 }

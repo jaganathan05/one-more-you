@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.onemoreyou.ui.AppIcon
+import com.onemoreyou.ui.LocalAppLook
 import com.onemoreyou.ui.BarColors
 import com.onemoreyou.ui.SectionCard
 import com.onemoreyou.ui.StatusLine
@@ -55,19 +56,26 @@ data class HomeLimitRow(
 )
 
 data class HomeUiState(
-    val headline: String,
-    val permissionsReady: Boolean = false,
-    val overlayOn: Boolean = false,
-    val usageOn: Boolean = false,
-    val exactAlarmOn: Boolean = false,
-    val scheduleTitle: String = "No schedule today",
-    val scheduleDetail: String = "",
+    val greeting: String = "Good morning",
+    val dayLine: String = "",
+    val locked: Boolean = false,
+    val empty: Boolean = true,
+    val scheduleOn: Boolean = false,
+    val phase: String = "none",
+    val focusTitle: String = "No schedule today",
+    val focusLine: String = "Your limits still count.",
+    val windowProgress: Float = 0f,
+    val startLabel: String = "",
+    val endLabel: String = "",
+    val appsLine: String = "",
+    val tomorrowTitle: String = "",
+    val tomorrowLine: String = "",
     val limits: List<HomeLimitRow> = emptyList(),
 )
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val container = (app as OneMoreYouApp).container
-    private val _ui = MutableStateFlow(HomeUiState(headline = "Checking blocking status"))
+    private val _ui = MutableStateFlow(HomeUiState())
     val ui: StateFlow<HomeUiState> = _ui.asStateFlow()
 
     init {
@@ -106,19 +114,65 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
             }
-            val names = config.monitored.joinToString(", ") { it.label }.ifBlank { "No apps added" }
+            val names = config.monitored.map { it.label }
+            val appsLine = when (names.size) {
+                0 -> ""
+                1 -> "${names[0]} is closed"
+                2 -> "${names[0]} and ${names[1]} are closed"
+                else -> "${names[0]}, ${names[1]} and ${names.size - 2} more are closed"
+            }
+            val minute = now.hour * 60 + now.minute
+            val start = window?.startMinuteOfDay ?: 0
+            val end = window?.endMinuteOfDay ?: 0
+            val phase = when {
+                !scheduleOn -> "none"
+                start < end && minute in start until end -> "during"
+                start > end && (minute >= start || minute < end) -> "during"
+                start < end && minute < start -> "before"
+                start > end && minute in end until start -> "before"
+                else -> "after"
+            }
+            val span = if (start == end) 1 else if (start < end) end - start else (24 * 60 - start) + end
+            val elapsed = when {
+                start < end -> (minute - start).coerceIn(0, span)
+                minute >= start -> minute - start
+                else -> (24 * 60 - start) + minute
+            }
+            val tomorrow = Weekday.from(now.plusDays(1).dayOfWeek)
+            val next = config.sharedSchedule.days[tomorrow]
+            val tomorrowOn = config.sharedSchedule.enabled && next?.enabled == true && next.startMinuteOfDay != next.endMinuteOfDay
+            val hour = now.hour
             _ui.value = HomeUiState(
-                headline = "Today",
-                permissionsReady = overlay && usage && exact,
-                overlayOn = overlay,
-                usageOn = usage,
-                exactAlarmOn = exact,
-                scheduleTitle = if (scheduleOn) {
-                    "${BlockText.minuteOfDay(window!!.startMinuteOfDay)} – ${BlockText.minuteOfDay(window.endMinuteOfDay)}"
-                } else {
-                    "No schedule today"
+                greeting = when {
+                    hour < 12 -> "Good morning"
+                    hour < 17 -> "Good afternoon"
+                    else -> "Good evening"
                 },
-                scheduleDetail = if (scheduleOn) "${day.name.lowercase().replaceFirstChar { it.uppercase() }} · $names" else "You manage this day yourself.",
+                dayLine = "${day.name.lowercase().replaceFirstChar { it.uppercase() }} · Here is your day",
+                locked = container.repository.isScheduleLocked(),
+                empty = config.monitored.isEmpty() && limits.isEmpty(),
+                scheduleOn = scheduleOn,
+                phase = phase,
+                focusTitle = when (phase) {
+                    "during" -> "Apps closed until ${BlockText.minuteOfDay(end)}"
+                    "before" -> "Apps close at ${BlockText.minuteOfDay(start)}"
+                    "after" -> "Apps opened at ${BlockText.minuteOfDay(end)}"
+                    else -> "No schedule today"
+                },
+                focusLine = when (phase) {
+                    "during" -> "${BlockText.duration(((span - elapsed).coerceAtLeast(0)) * 60_000L)} left · started ${BlockText.minuteOfDay(start)}"
+                    else -> "Your limits still count."
+                },
+                windowProgress = if (phase == "during") elapsed.toFloat() / span else 0f,
+                startLabel = BlockText.minuteOfDay(start),
+                endLabel = BlockText.minuteOfDay(end),
+                appsLine = appsLine,
+                tomorrowTitle = "Tomorrow · ${tomorrow.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                tomorrowLine = if (tomorrowOn) {
+                    "${BlockText.minuteOfDay(next!!.startMinuteOfDay)} – ${BlockText.minuteOfDay(next.endMinuteOfDay)}"
+                } else {
+                    "No schedule. Your limits still count."
+                },
                 limits = limits,
             )
         }
@@ -158,57 +212,60 @@ private fun HomeScreen(
             .padding(PaddingValues(20.dp)),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("ONE MORE YOU", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-        Text(state.headline, style = MaterialTheme.typography.headlineSmall)
-        Text(
-            "Selected apps stay closed during today's window.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SectionCard(title = "Scheduled time") {
-            Text(state.scheduleTitle, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.tertiary)
-            Text(state.scheduleDetail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val look = LocalAppLook.current
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("ONE MORE YOU", style = MaterialTheme.typography.labelLarge, color = look.accent)
+            if (state.locked) Text("Locked", color = look.accent, style = MaterialTheme.typography.labelLarge)
         }
-        if (!state.permissionsReady) {
-            SectionCard(title = "Permissions") {
-                StatusLine("Display over apps", if (state.overlayOn) "On" else "Off", state.overlayOn)
-                StatusLine("Usage access", if (state.usageOn) "On" else "Off", state.usageOn)
-                StatusLine("Exact alarms", if (state.exactAlarmOn) "Allowed" else "Not allowed", state.exactAlarmOn)
-                if (!state.overlayOn) WideButton("Allow display over apps", onAccessibility)
-                if (!state.usageOn) WideButton("Open usage access", onUsage)
-                if (!state.exactAlarmOn) WideButton("Allow exact alarms", onExactAlarm)
+        Text(state.greeting, style = MaterialTheme.typography.headlineSmall)
+        Text(state.dayLine, color = look.muted)
+        if (state.empty) {
+            SectionCard("Schedule") {
+                Text("Not set", color = look.accent)
+                Text("Close apps during fixed hours, like work or study time. Example: Instagram closed Mon–Fri, 9 AM to 7 PM.", color = look.muted)
             }
-        }
-        state.limits.forEachIndexed { index, app ->
-            val fraction = when {
-                app.limitMillis < 0L -> 0f
-                app.limitMillis == 0L -> 1f
-                else -> (app.usedMillis.toFloat() / app.limitMillis).coerceIn(0f, 1f)
+            SectionCard("Daily limits") {
+                Text("None yet", color = look.accent)
+                Text("Give an app a daily time budget. When it runs out, the app closes until tomorrow.", color = look.muted)
             }
-            val color = BarColors[index % BarColors.size]
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                AppIcon(app.packageName, app.label)
-                Column(modifier = Modifier.padding(start = 12.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(app.label, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "${BlockText.duration(app.usedMillis)} of ${BlockText.duration(app.limitMillis)}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(99.dp)),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(fraction)
-                                .height(8.dp)
-                                .background(color, RoundedCornerShape(99.dp)),
-                        )
+            Text("You can use both. A schedule closes apps by the clock. A limit closes them by time used.", color = look.faint, style = MaterialTheme.typography.bodySmall)
+        } else {
+            SectionCard(if (state.phase == "during") "FOCUS TIME IS ON" else if (state.phase == "before") "STARTS LATER" else if (state.phase == "after") "DONE FOR TODAY" else "TODAY") {
+                Text(state.focusTitle, style = MaterialTheme.typography.titleMedium)
+                Text(state.focusLine, color = look.muted)
+                if (state.phase == "during") {
+                    Box(Modifier.fillMaxWidth().height(8.dp).background(look.raised, RoundedCornerShape(99.dp))) {
+                        Box(Modifier.fillMaxWidth(state.windowProgress.coerceIn(0f, 1f)).height(8.dp).background(look.accent, RoundedCornerShape(99.dp)))
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(state.startLabel, color = look.faint, style = MaterialTheme.typography.bodySmall)
+                        Text(state.endLabel, color = look.faint, style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (state.appsLine.isNotBlank()) Text(state.appsLine, color = look.text)
+                }
+            }
+            Text("TODAY'S LIMITS", color = look.muted, style = MaterialTheme.typography.labelLarge)
+            state.limits.forEach { app ->
+                val usedUp = app.limitMillis > 0 && app.usedMillis >= app.limitMillis
+                val left = (app.limitMillis - app.usedMillis).coerceAtLeast(0L)
+                val fraction = if (app.limitMillis <= 0L) 0f else (app.usedMillis.toFloat() / app.limitMillis).coerceIn(0f, 1f)
+                val bar = if (usedUp) look.timeUp else look.good
+                Column(Modifier.fillMaxWidth().background(look.card, RoundedCornerShape(16.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AppIcon(app.packageName, app.label)
+                        Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                            Text(app.label, style = MaterialTheme.typography.titleMedium)
+                            Text("${BlockText.duration(app.usedMillis)} of ${BlockText.duration(app.limitMillis)}", color = look.muted, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Text(if (usedUp) "Time's up" else "${BlockText.duration(left)} left", color = if (usedUp) look.timeUp else look.good, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Box(Modifier.fillMaxWidth().height(8.dp).background(look.raised, RoundedCornerShape(99.dp))) {
+                        Box(Modifier.fillMaxWidth(fraction).height(8.dp).background(bar, RoundedCornerShape(99.dp)))
                     }
                 }
+            }
+            SectionCard(state.tomorrowTitle) {
+                Text(state.tomorrowLine)
             }
         }
     }

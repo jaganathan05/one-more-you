@@ -12,12 +12,13 @@ object UsageEventMapper {
     const val MOVE_TO_FOREGROUND = 1
     const val MOVE_TO_BACKGROUND = 2
     const val CONTINUE_PREVIOUS_DAY = 4
+    const val ACTIVITY_STOPPED = 23
 
     fun toTransition(eventType: Int, packageName: String, timeMillis: Long): UsageTransition? {
         if (packageName.isBlank()) return null
         val type = when (eventType) {
             MOVE_TO_FOREGROUND, CONTINUE_PREVIOUS_DAY -> TransitionType.ENTER
-            MOVE_TO_BACKGROUND -> TransitionType.EXIT
+            MOVE_TO_BACKGROUND, ACTIVITY_STOPPED -> TransitionType.EXIT
             else -> return null
         }
         return UsageTransition(packageName, timeMillis, type)
@@ -76,5 +77,21 @@ object UsageCalculator {
             }
         }
         return current
+    }
+}
+
+object UsageSession {
+    /**
+     * Phone usage logs often omit the still-open visit until the app is left.
+     * Count that visit from the moment we saw it, without adding it twice once the log catches up.
+     */
+    fun millisToday(
+        loggedMillis: Long,
+        logShowsThisAppOpen: Boolean,
+        seenOpenAtMillis: Long?,
+        nowMillis: Long,
+    ): Long {
+        if (logShowsThisAppOpen || seenOpenAtMillis == null) return loggedMillis
+        return loggedMillis + (nowMillis - seenOpenAtMillis).coerceAtLeast(0L)
     }
 }

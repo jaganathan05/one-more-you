@@ -23,8 +23,28 @@ class UsageTracker(context: Context) {
     fun currentForeground(now: ZonedDateTime = ZonedDateTime.now()): String? {
         if (!permissions.usageAccessGranted()) return null
         val end = now.toInstant().toEpochMilli()
-        val start = end - LOOKBACK_MILLIS
-        return UsageCalculator.foregroundPackageAt(readTransitions(start, end), end)
+        val recent = recentUsagePackage(end)
+        if (recent != null) return recent
+        val transitions = readTransitions(end - LOOKBACK_MILLIS, end)
+        val open = UsageCalculator.foregroundPackageAt(transitions, end) ?: return null
+        val lastForOpen = transitions.lastOrNull { it.packageName == open } ?: return null
+        if (lastForOpen.type != TransitionType.ENTER) return null
+        if (end - lastForOpen.atMillis > EVENT_FRESH_MILLIS) return null
+        val newer = transitions.any { it.atMillis > lastForOpen.atMillis && it.packageName != open }
+        if (newer) return null
+        return open
+    }
+
+    private fun recentUsagePackage(end: Long): String? {
+        val manager = stats ?: return null
+        val rows = runCatching {
+            manager.queryUsageStats(UsageStatsManager.INTERVAL_BEST, end - LOOKBACK_MILLIS, end)
+        }.getOrNull().orEmpty()
+        val best = rows.maxByOrNull { it.lastTimeUsed } ?: return null
+        val name = best.packageName
+        if (name.isNullOrBlank()) return null
+        if (end - best.lastTimeUsed > RECENT_WINDOW_MILLIS) return null
+        return name
     }
 
     private fun readTransitions(start: Long, end: Long): List<UsageTransition> {
@@ -42,5 +62,7 @@ class UsageTracker(context: Context) {
 
     private companion object {
         const val LOOKBACK_MILLIS = 12L * 60L * 60L * 1000L
+        const val RECENT_WINDOW_MILLIS = 20_000L
+        const val EVENT_FRESH_MILLIS = 60_000L
     }
 }

@@ -18,6 +18,8 @@ It runs on Android 8 and newer. The phone does not need an account, and the app 
 
 The APK is not built on every push. On GitHub, open **Actions**, choose **Build APK**, and click **Run workflow**. When the run finishes, the release APK is attached to a GitHub release.
 
+Later, that build should also run the engine tests on every push, and the Schedule, lock, Limits, and Settings screens need automated tests in the same build.
+
 You can also build it locally:
 
 ```bash

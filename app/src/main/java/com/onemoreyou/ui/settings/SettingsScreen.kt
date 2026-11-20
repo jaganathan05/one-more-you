@@ -46,7 +46,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.onemoreyou.OneMoreYouApp
 import com.onemoreyou.domain.LearningPassAllowance
 import com.onemoreyou.settings.UninstallLock
-import com.onemoreyou.ui.AppAccent
+import com.onemoreyou.ui.AppLooks
+import com.onemoreyou.ui.LocalAppLook
 import com.onemoreyou.ui.StatusLine
 import com.onemoreyou.ui.LockConfirmDialog
 import com.onemoreyou.ui.UnlockPrayers
@@ -70,7 +71,7 @@ data class SettingsUiState(
     val scheduleReady: Boolean = false,
     val passesPerDay: Int = 1,
     val passMinutes: Int = 10,
-    val accent: String = AppAccent.SKY.id,
+    val accent: String = AppLooks.Midnight.id,
 )
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
@@ -94,7 +95,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                         passMinutes = config.learningPassMinutes.coerceIn(1, LearningPassAllowance.MAX_PASS_MINUTES),
                         accent = theme,
                         scheduleLocked = scheduleLocked,
-                        scheduleReady = config.sharedSchedule.days.values.any { day ->
+                        scheduleReady = config.monitored.isNotEmpty() && config.sharedSchedule.days.values.any { day ->
                             day.enabled && day.startMinuteOfDay != day.endMinuteOfDay
                         },
                     )
@@ -188,10 +189,7 @@ private fun SettingsScreen(
             Icon(Icons.Filled.Palette, contentDescription = "Theme", tint = MaterialTheme.colorScheme.primary)
             Text("Theme", style = MaterialTheme.typography.titleMedium)
         }
-        Text(
-            "Tap a color icon. It changes buttons and highlights inside the app. The home-screen icon stays the same.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text("Color inside the app", color = MaterialTheme.colorScheme.onSurfaceVariant)
         ThemeIcons(selectedId = state.accent, onTheme = onTheme)
         var setup by remember { mutableStateOf(false) }
         var askUninstall by remember { mutableStateOf<Boolean?>(null) }
@@ -214,10 +212,7 @@ private fun SettingsScreen(
             if (!state.usageOn) WideButton("Allow usage access", onUsage)
             if (!state.exactAlarmOn) WideButton("Allow exact alarms", onExactAlarm)
             StatusLine("Uninstall lock", if (state.uninstallLocked) "On" else "Off", state.uninstallLocked)
-            Text(
-                "While this is on, the phone blocks uninstall. Turning it on asks you to confirm. Turning it off asks you to type a prayer.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text("Stops uninstall", color = MaterialTheme.colorScheme.onSurfaceVariant)
             WideButton(
                 if (state.uninstallLocked) "Turn off uninstall lock" else "Turn on uninstall lock",
                 onClick = {
@@ -230,11 +225,7 @@ private fun SettingsScreen(
             )
             StatusLine("Schedule lock", if (state.scheduleLocked) "On" else "Off", state.scheduleLocked)
             Text(
-                if (state.scheduleReady || state.scheduleLocked) {
-                    "While this is on, the schedule days, times, apps, and passes are read-only. Turning it on asks you to confirm. Unlocking asks you to type a prayer."
-                } else {
-                    "Pick at least one day on the Schedule tab before this can be locked. With no day on, there is nothing to lock."
-                },
+                if (state.scheduleReady || state.scheduleLocked) "Stops changes to the schedule" else "Add an app and a day on Schedule first",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             WideButton(
@@ -254,7 +245,7 @@ private fun SettingsScreen(
             if (turningUninstallOn == true) {
                 LockConfirmDialog(
                     title = "Turn on uninstall lock",
-                    explanation = "The phone will block uninstall of ONE MORE YOU.",
+                    explanation = "The phone will not let this app be removed.",
                     confirmLabel = "Turn on",
                     onDismiss = { askUninstall = null },
                     onConfirmed = {
@@ -280,7 +271,7 @@ private fun SettingsScreen(
             if (askSchedule && !state.scheduleLocked) {
                 LockConfirmDialog(
                     title = "Lock the schedule",
-                    explanation = "Locking makes the days, times, apps, and passes read-only.",
+                    explanation = "Days, times, and apps stay as they are.",
                     confirmLabel = "Lock",
                     onDismiss = { askSchedule = false },
                     onConfirmed = {
@@ -304,12 +295,10 @@ private fun SettingsScreen(
                 )
             }
         } else {
-            Text("1. Allow display over other apps and usage access.")
-            Text("2. Add apps on the Schedule tab. One schedule closes all of them on the days you turn on.")
-            Text("3. Pick any installed app on Limits and set one daily limit, or a limit for each weekday.")
-            Text("4. On iQOO, allow autostart and high background power, then lock ONE MORE YOU in recent apps.")
-            Text("5. Open the app once after a reboot. Turn on the uninstall lock here if the app should stay installed.")
-            Text("6. On Schedule, add the apps for the schedule. The default hours are 9:00 AM to 7:00 PM. Pass is off until you turn it on. While the schedule is locked, the pass cannot be changed. Locking asks you to confirm. Unlocking asks you to type a prayer about reducing screen time.")
+            Text("1. Turn on the three permissions above.")
+            Text("2. On Schedule, pick the days, the hours, and the apps.")
+            Text("3. On Limits, set how long each app can stay open today.")
+            Text("4. Lock the schedule when you are done.")
         }
     }
 }
@@ -368,12 +357,12 @@ private fun ThemeIcons(selectedId: String, onTheme: (String) -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        AppAccent.entries.forEach { accent ->
-            val selected = selectedId == accent.id
+        AppLooks.all.forEach { theme ->
+            val selected = AppLooks.fromId(selectedId).id == theme.id
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .clickable { onTheme(accent.id) },
+                    .clickable { onTheme(theme.id) },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -381,7 +370,7 @@ private fun ThemeIcons(selectedId: String, onTheme: (String) -> Unit) {
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
-                        .background(accent.color)
+                        .background(theme.accent)
                         .border(
                             width = if (selected) 3.dp else 1.dp,
                             color = if (selected) Color.White else Color.White.copy(alpha = 0.28f),
@@ -392,15 +381,15 @@ private fun ThemeIcons(selectedId: String, onTheme: (String) -> Unit) {
                     if (selected) {
                         Icon(
                             Icons.Filled.Check,
-                            contentDescription = "${accent.label} selected",
-                            tint = Color(0xFF1A1208),
+                            contentDescription = "${theme.name} selected",
+                            tint = theme.onAccent,
                         )
                     }
                 }
                 Text(
-                    accent.label,
+                    theme.name,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (selected) accent.color else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (selected) theme.accent else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

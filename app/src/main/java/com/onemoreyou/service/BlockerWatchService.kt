@@ -13,7 +13,6 @@ import com.onemoreyou.OneMoreYouApp
 import com.onemoreyou.R
 import com.onemoreyou.blocking.BlockingCoordinator
 import com.onemoreyou.blocking.OverlayController
-import com.onemoreyou.blocking.PaymentApps
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,8 +40,7 @@ class BlockerWatchService : Service() {
     }
 
     override fun onDestroy() {
-        ReevaluateBus.setListener(null)
-        coordinator?.stop()
+        coordinator?.let { BlockerHub.release(it) }
         coordinator = null
         scope.cancel()
         super.onDestroy()
@@ -50,32 +48,27 @@ class BlockerWatchService : Service() {
 
     private fun startCoordinator() {
         val container = (application as OneMoreYouApp).container
-        val created = BlockingCoordinator(
-            appContext = this,
-            ownPackage = packageName,
-            repository = container.repository,
-            usageTracker = container.usageTracker,
-            overlay = OverlayController(
-                context = this,
-                onRequestPass = { coordinator?.onConfirmPass() },
-                onLeave = { goHome() },
-            ),
-            leaveApp = { goHome() },
-            scope = scope,
-        )
+        val created = BlockerHub.retain { coordinatorScope ->
+            BlockingCoordinator(
+                appContext = this,
+                ownPackage = packageName,
+                repository = container.repository,
+                usageTracker = container.usageTracker,
+                overlay = OverlayController(
+                    context = this,
+                    onRequestPass = { coordinator?.onConfirmPass() },
+                    onLeave = { goHome() },
+                ),
+                leaveApp = { goHome() },
+                scope = coordinatorScope,
+            )
+        }
         coordinator = created
-        created.start()
-        ReevaluateBus.setListener { created.reevaluate() }
         scope.launch(Dispatchers.Default) {
             while (job.isActive) {
                 val foreground = container.usageTracker.currentForeground()
                 withContext(Dispatchers.Main) {
-                    when {
-                        foreground.isNullOrBlank() -> created.reevaluate()
-                        PaymentApps.isPayment(foreground) -> created.onPaymentApp()
-                        foreground == packageName -> created.onWindow(foreground, MAIN_ACTIVITY)
-                        else -> created.onWindow(foreground, null)
-                    }
+                    created.onUsageHint(foreground)
                 }
                 delay(1_000)
             }
@@ -129,6 +122,5 @@ class BlockerWatchService : Service() {
     private companion object {
         const val CHANNEL_ID = "blocker_watch_min"
         const val NOTIFICATION_ID = 4104
-        const val MAIN_ACTIVITY = "com.onemoreyou.MainActivity"
     }
 }

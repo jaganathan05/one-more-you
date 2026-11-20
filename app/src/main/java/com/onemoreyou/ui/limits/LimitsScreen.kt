@@ -164,7 +164,7 @@ private fun LimitList(state: LimitsUiState, model: LimitsViewModel) {
     ) {
         Text("Limits", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Lowering a limit saves immediately. Raising it asks you to type a paragraph.",
+            "How long each app can stay open.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Button(
@@ -309,7 +309,7 @@ private fun LimitEditor(state: LimitsUiState, model: LimitsViewModel) {
                 }
             }
             Text(
-                "Leave a day empty when that day should have no limit. 0 is not a limit.",
+                "An empty day has no limit.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             TextButton(onClick = {
