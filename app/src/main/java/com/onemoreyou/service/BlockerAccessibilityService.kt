@@ -68,9 +68,9 @@ class BlockerAccessibilityService : AccessibilityService() {
     private fun reportForeground(windowPackage: String?, className: String? = null) {
         if (windowPackage.isNullOrBlank()) return
         when {
-            PaymentApps.isPayment(windowPackage) -> {
+            PaymentApps.mustPause(windowPackage) -> {
                 coordinator?.onPaymentApp()
-                runCatching { PaymentPause.pause(this) }
+                PaymentPause.pause(this)
             }
             isLauncher(windowPackage) -> coordinator?.onAccessibilityHome()
             isIgnoredSystem(windowPackage) -> Unit

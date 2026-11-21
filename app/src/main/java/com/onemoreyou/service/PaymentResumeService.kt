@@ -12,9 +12,9 @@ import androidx.core.app.NotificationCompat
 import com.onemoreyou.R
 
 /**
- * Google Pay keeps its own "payments blocked" screen until accessibility stays off,
- * including across an app restart. This service only tells the user. It does not
- * turn the blocker back on.
+ * Google Play and Google Pay keep installs, purchases, and payments blocked until
+ * this accessibility service stays off. This service only tells the user. It does
+ * not turn the blocker back on.
  */
 class PaymentResumeService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
@@ -42,22 +42,23 @@ class PaymentResumeService : Service() {
             manager?.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_ID,
-                    "Payments",
+                    "Play and Pay",
                     NotificationManager.IMPORTANCE_HIGH,
                 ).apply {
-                    description = "Shown when blocking is turned off so a payment app can run"
+                    description = "Shown when blocking is turned off so Play or a payment app can run"
                 },
             )
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_pass_notification)
             .setContentTitle("Blocking is off")
-            .setContentText("Google Pay needs Accessibility off. Turn it back on after you pay.")
+            .setContentText("Google Play needs Accessibility off. Turn it back on after you install.")
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "Google Pay needs ONE MORE YOU's Accessibility service off. " +
-                        "It stays off until you turn it on in Settings. " +
-                        "If Google Pay still says payments are blocked, restart the phone and leave Accessibility off.",
+                    "Google Play blocks installs and purchases while ONE MORE YOU's Accessibility service is on. " +
+                        "Google Pay does the same for payments. The service stays off until you turn it on in Settings. " +
+                        "Open Play or Pay again after it turns off. " +
+                        "If Play still says the product is blocked, restart the phone and leave Accessibility off.",
                 ),
             )
             .setAutoCancel(true)

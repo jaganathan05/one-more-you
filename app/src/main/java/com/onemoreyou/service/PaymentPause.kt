@@ -1,10 +1,14 @@
 package com.onemoreyou.service
 
+import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import android.provider.Settings
 
 object PaymentPause {
+    private var pausedAtElapsed = 0L
+
     fun serviceId(context: Context): String =
         "${context.packageName}/com.onemoreyou.service.BlockerAccessibilityService"
 
@@ -16,24 +20,15 @@ object PaymentPause {
         return enabled.split(':').any { it.equals(serviceId(context), ignoreCase = true) }
     }
 
-    fun pause(context: Context) {
-        val appContext = context.applicationContext
-        appContext.startForegroundService(Intent(appContext, PaymentResumeService::class.java))
-        val resolver = appContext.contentResolver
-        val current = Settings.Secure.getString(
-            resolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-        ).orEmpty()
-        val kept = current.split(':').filter { part ->
-            part.isNotBlank() && !part.equals(serviceId(appContext), ignoreCase = true)
+    fun pause(service: AccessibilityService) {
+        val now = SystemClock.elapsedRealtime()
+        if (now - pausedAtElapsed < 5_000L) return
+        if (!ourServiceEnabled(service)) return
+        pausedAtElapsed = now
+        val appContext = service.applicationContext
+        runCatching {
+            appContext.startForegroundService(Intent(appContext, PaymentResumeService::class.java))
         }
-        Settings.Secure.putString(
-            resolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-            kept.joinToString(":"),
-        )
-        if (kept.isEmpty()) {
-            Settings.Secure.putInt(resolver, Settings.Secure.ACCESSIBILITY_ENABLED, 0)
-        }
+        service.disableSelf()
     }
 }

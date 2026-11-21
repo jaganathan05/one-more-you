@@ -80,7 +80,7 @@ class BlockingCoordinator(
     }
 
     fun onUsageHint(packageName: String?) {
-        if (packageName != null && PaymentApps.isPayment(packageName)) {
+        if (packageName != null && PaymentApps.mustPause(packageName)) {
             onPaymentApp()
             return
         }
@@ -97,7 +97,7 @@ class BlockingCoordinator(
     }
 
     fun onWindow(packageName: String?, className: String?, authoritative: Boolean = false) {
-        if (packageName != null && PaymentApps.isPayment(packageName)) {
+        if (packageName != null && PaymentApps.mustPause(packageName)) {
             onPaymentApp()
             return
         }
