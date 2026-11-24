@@ -10,7 +10,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
-import com.onemoreyou.service.PaymentPause
 class PermissionGateway(private val context: Context) {
     fun usageAccessGranted(): Boolean {
         val appOps = context.getSystemService(AppOpsManager::class.java) ?: return false
@@ -39,15 +38,13 @@ class PermissionGateway(private val context: Context) {
         return alarms.canScheduleExactAlarms()
     }
 
-    fun accessibilityEnabled(): Boolean = PaymentPause.ourServiceEnabled(context)
-
     fun notificationsGranted(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
         return context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     }
 
     fun readyToBlock(): Boolean =
-        overlayGranted() && usageAccessGranted() && exactAlarmsAllowed() && accessibilityEnabled() && notificationsGranted()
+        overlayGranted() && usageAccessGranted() && exactAlarmsAllowed() && notificationsGranted()
 
     fun usageAccessIntent(): Intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).newTask()
 
@@ -62,8 +59,6 @@ class PermissionGateway(private val context: Context) {
             data = Uri.parse("package:${context.packageName}")
         }.newTask()
     }
-
-    fun accessibilityIntent(): Intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).newTask()
 
     fun appDetailsIntent(): Intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
         data = Uri.parse("package:${context.packageName}")

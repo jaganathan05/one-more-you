@@ -12,13 +12,13 @@ object UsageEventMapper {
     const val MOVE_TO_FOREGROUND = 1
     const val MOVE_TO_BACKGROUND = 2
     const val CONTINUE_PREVIOUS_DAY = 4
-    const val ACTIVITY_STOPPED = 23
+    const val ACTIVITY_RESUMED = 23
 
     fun toTransition(eventType: Int, packageName: String, timeMillis: Long): UsageTransition? {
         if (packageName.isBlank()) return null
         val type = when (eventType) {
             MOVE_TO_FOREGROUND, CONTINUE_PREVIOUS_DAY -> TransitionType.ENTER
-            MOVE_TO_BACKGROUND, ACTIVITY_STOPPED -> TransitionType.EXIT
+            MOVE_TO_BACKGROUND -> TransitionType.EXIT
             else -> return null
         }
         return UsageTransition(packageName, timeMillis, type)
@@ -48,11 +48,8 @@ object UsageCalculator {
             }
             if (transition.type == TransitionType.ENTER) {
                 if (openFrom == null) openFrom = transition.atMillis
-            } else {
-                val begin = when (val opened = openFrom) {
-                    null -> rangeStartMillis
-                    else -> maxOf(opened, rangeStartMillis)
-                }
+            } else if (openFrom != null) {
+                val begin = maxOf(openFrom, rangeStartMillis)
                 if (transition.atMillis > begin) total += transition.atMillis - begin
                 openFrom = null
             }
@@ -61,7 +58,7 @@ object UsageCalculator {
             val begin = maxOf(openFrom, rangeStartMillis)
             if (rangeEndMillis > begin) total += rangeEndMillis - begin
         }
-        return total
+        return total.coerceAtMost(rangeEndMillis - rangeStartMillis)
     }
 
     fun foregroundPackageAt(transitions: List<UsageTransition>, atMillis: Long): String? {

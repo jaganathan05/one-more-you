@@ -76,7 +76,6 @@ fun SetupRoute(permissions: PermissionGateway, onChanged: () -> Unit) {
             add(SetupStep("Show over other apps", "shows the block screen", "Tap Allow. Turn on ONE MORE YOU, then press Back.", "Allow display over apps", permissions.overlayGranted()) { context.startActivity(permissions.overlayIntent()) })
             add(SetupStep("See app usage", "counts your time in each app", "Tap Allow. Turn on ONE MORE YOU, then press Back.", "Allow usage access", permissions.usageAccessGranted()) { context.startActivity(permissions.usageAccessIntent()) })
             add(SetupStep("Alarms", "lets the schedule start and end on time", "Tap Allow. In phone settings, turn on Allow setting alarms, then press Back. We check it for you.", "Allow alarms", permissions.exactAlarmsAllowed()) { permissions.exactAlarmIntent()?.let(context::startActivity) })
-            add(SetupStep("Watch the open app", "knows which app is open", "In the list, tap ONE MORE YOU and turn it on.", "Turn on ONE MORE YOU", permissions.accessibilityEnabled()) { context.startActivity(permissions.accessibilityIntent()) })
             if (showNotifications) {
                 add(SetupStep("Notifications", "keeps the blocker running", "Tap Allow on the phone prompt.", "Allow notifications", permissions.notificationsGranted()) { askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS) })
             }

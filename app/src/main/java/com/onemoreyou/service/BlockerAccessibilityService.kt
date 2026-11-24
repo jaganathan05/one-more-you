@@ -70,7 +70,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         when {
             PaymentApps.mustPause(windowPackage) -> {
                 coordinator?.onPaymentApp()
-                PaymentPause.pause(this)
+                if (PaymentPause.wantsPause(this)) PaymentPause.pause(this)
             }
             isLauncher(windowPackage) -> coordinator?.onAccessibilityHome()
             isIgnoredSystem(windowPackage) -> Unit

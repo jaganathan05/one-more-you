@@ -13,6 +13,7 @@ import com.onemoreyou.OneMoreYouApp
 import com.onemoreyou.R
 import com.onemoreyou.blocking.BlockingCoordinator
 import com.onemoreyou.blocking.OverlayController
+import com.onemoreyou.blocking.PaymentApps
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -67,6 +68,9 @@ class BlockerWatchService : Service() {
         scope.launch(Dispatchers.Default) {
             while (job.isActive) {
                 val foreground = container.usageTracker.currentForeground()
+                if (!foreground.isNullOrBlank() && !PaymentApps.mustPause(foreground)) {
+                    PaymentPause.resumeAfterPayment(this@BlockerWatchService)
+                }
                 withContext(Dispatchers.Main) {
                     created.onUsageHint(foreground)
                 }

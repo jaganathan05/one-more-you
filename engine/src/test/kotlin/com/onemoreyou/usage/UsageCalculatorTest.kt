@@ -39,11 +39,14 @@ class UsageCalculatorTest {
     }
 
     @Test
-    fun exitWithoutEnterCountsFromRangeStart() {
+    fun exitWithoutEnterDoesNotCountTheWholeMorning() {
         val start = millis(2026, 11, 16, 10, 0)
         val end = millis(2026, 11, 16, 11, 0)
-        val transitions = listOf(exit("com.instagram.android", millis(2026, 11, 16, 10, 15)))
-        assertEquals(15 * 60_000L, UsageCalculator.foregroundMillis(transitions, "com.instagram.android", start, end))
+        val transitions = listOf(
+            exit("com.instagram.android", millis(2026, 11, 16, 10, 15)),
+            exit("com.instagram.android", millis(2026, 11, 16, 10, 40)),
+        )
+        assertEquals(0L, UsageCalculator.foregroundMillis(transitions, "com.instagram.android", start, end))
     }
 
     @Test
@@ -84,9 +87,9 @@ class UsageCalculatorTest {
     }
 
     @Test
-    fun stoppedActivityClosesTheVisit() {
-        val mapped = UsageEventMapper.toTransition(UsageEventMapper.ACTIVITY_STOPPED, "com.instagram.android", 5_000)
-        assertEquals(TransitionType.EXIT, mapped?.type)
+    fun resumedActivityIsNotAClose() {
+        val mapped = UsageEventMapper.toTransition(UsageEventMapper.ACTIVITY_RESUMED, "com.instagram.android", 5_000)
+        assertNull(mapped)
     }
 
     @Test
